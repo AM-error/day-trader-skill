@@ -1,6 +1,6 @@
 # The Day Trader skill
 
-11 Claude skills for day trading: scan thousands of charts, track breaking news, time every entry and exit, and replay every outcome before you risk a dollar.
+12 Claude skills for day trading: scan thousands of charts, track breaking news, time every entry and exit, replay every outcome before you risk a dollar, and improve the rule without fooling yourself.
 
 Free, MIT, no signup, no API key. The tools are plain Python that read free
 public data: Yahoo Finance charts, Nasdaq Trader's symbol lists, SEC EDGAR
@@ -57,7 +57,7 @@ The tools need Python 3.8 or newer. Nothing to pip install. The SEC tools
 email in `trader/config.json` (`"sec_user_agent": "Your Name you@example.com"`)
 or in the `SEC_USER_AGENT` environment variable.
 
-## The eleven
+## The twelve
 
 | command | job | what it does |
 | --- | --- | --- |
@@ -72,6 +72,7 @@ or in the `SEC_USER_AGENT` environment variable.
 | `/trader-alerts` | Price Alerts | Rings when a price, a stop or the opening bell hits. |
 | `/trader-analyst` | Earnings Analyst | Reads earnings reports and sums up what changed. |
 | `/trader-pelosi` | Pelosi Tracker | Reads Congress's stock-trade disclosures the minute they are filed. |
+| `/trader-lab` | Strategy Lab | A controlled self-improvement loop: Claude proposes one change to the rule, the lab tests it net of costs on dates it has not seen, and keeps it only if it survives every check. |
 
 ## How to use it
 
@@ -79,6 +80,7 @@ Everything lands in a `trader/` folder in your project, and each skill reads
 what the last one wrote:
 
 ```
+lab: diagnose -> hypothesize -> test -> keep or revert                       (the rule, before the day)
 scanner -> news -> entry -> exit -> timemachine -> budget -> risk -> broker   (one trade)
 alerts: stop, target, flat by the close                                       (while it is open)
 news / analyst / pelosi                                                        (on a schedule)
@@ -141,7 +143,34 @@ python3 trader-alerts/alerts.py add --from-plan                        # stop, t
 python3 trader-alerts/alerts.py check                                  # rings what hit, once
 python3 trader-analyst/facts.py TSLA                                   # quarters, growth, EPS
 python3 trader-pelosi/ptr.py index --member pelosi                     # her PTRs this year
+python3 trader-lab/lab.py fetch --symbols TSLA,NVDA,AMD,AAPL,META      # freeze 60 days of 5-min bars
+python3 trader-lab/lab.py init                                         # dev / validation / locked holdout
+python3 trader-lab/lab.py diagnose                                     # where the rule loses
+python3 trader-lab/lab.py test trader/lab/candidate.json --note "..."  # PROMOTABLE or KEEP CHAMPION
 ```
+
+## The Strategy Lab
+
+The other skills trade one setup at a time. `/trader-lab` asks whether the
+rule behind them earns anything after costs, and lets Claude try to improve
+it without fooling itself:
+
+1. **Observe.** `diagnose` breaks the champion's trades down by range width,
+   gap, entry time, breakout volume and symbol, on the development dates only.
+2. **Hypothesize.** Claude writes one change as a JSON spec, with the reason.
+3. **Test.** The lab scores it on validation dates, net of slippage, against
+   five checks: enough trades, beats the champion by more than a noise bar
+   that rises with every experiment, survives twice the costs, holds in 3 of 4
+   time windows, and survives nudging its numbers.
+4. **Keep or revert.** Only a candidate that passes every check, and that you
+   say yes to, becomes the next champion. Every experiment is logged.
+5. **Holdout, then forward.** The last 20 % of dates stays locked until a
+   champion is promoted, and runs once per version. After that, the only
+   honest test is new sessions: `forward`, while you paper trade it.
+
+The lab changes the rule, never your limits: risk, budget, paper mode and the
+broker's yes are untouched. `show` prints the champion's commands for
+`/trader-entry` and `/trader-exit`.
 
 ```bash
 python3 -m unittest discover -s tests -v
@@ -210,6 +239,7 @@ trader-broker/      SKILL.md, ticket.py, claude_desktop_config.example.json
 trader-alerts/      SKILL.md, alerts.py, alerts.example.json
 trader-analyst/     SKILL.md, facts.py, metrics.example.json
 trader-pelosi/      SKILL.md, ptr.py
+trader-lab/         SKILL.md, lab.py
 tests/              unittest suite + offline fixtures
 ```
 
